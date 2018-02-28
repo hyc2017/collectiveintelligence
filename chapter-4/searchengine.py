@@ -105,3 +105,96 @@ class crawler:
         self.con.execute('create index urltoidx on link(toid)')
         self.con.execute('create index urlfromidx on link(fromid)')
         self.dbcommit()
+
+class searcher:
+    def __init__(self, dbname):
+        self.con = sqlite3.connect(dbname)
+
+    def __del__(self):
+        self.con.close()
+
+    def getmatchrows(self, q):
+        fieldlist = 'w0.urlid'
+        tablelist = ''
+        clauselist = ''
+        wordids = []
+
+        words = q.split(" ")
+        tablenumber = 0
+
+        for word in words:
+            wordrow = self.con.execute("select rowid from wordlist where word = '%s'" % word)
+
+            if wordrow != None:
+                wordid = wordrow.fetchone()[0]
+                wordids.append(wordid)
+                if tablenumber > 0:
+                    tablelist += ','
+                    clauselist += ' and '
+                    clauselist += 'w%d.urlid = w%d.urlid and ' % (tablenumber - 1, tablenumber)
+                fieldlist += ',w%d.location' % tablenumber
+                tablelist += 'wordlocation w%d' % tablenumber
+                clauselist += 'w%d.wordid = %d' % (tablenumber, wordid)
+                tablenumber += 1
+
+        fullquery = 'select %s from %s where %s' % (fieldlist, tablelist, clauselist)
+        cur = self.con.execute(fullquery)
+        rows = [row for row in cur]
+
+        return rows, wordids
+
+    def getscorelist(self, rows, wordids):
+        totalscores = dict([(row[0], 0) for row in rows])
+        weights = [(1.0, self.frequencyscore(rows)), (1.0, self.locationscore(rows)), (1.0, self.distancescore(rows))]
+
+        for (weight,score) in weights:
+            for url in totalscores:
+                totalscores[url] += weight * score[url]
+
+        return totalscores
+
+    def geturlname(self, urlid):
+        return self.con.execute('select url from urllist where rowid = %d' % urlid).fetchone()[0]
+
+    def query(self, q):
+        rows, wordids = self.getmatchrows(q)
+        scores = self.getscorelist(rows, wordids)
+        rankedscores = sorted([(score,url) for (url,score) in scores.items()], reverse = 1)
+        for (score, url) in rankedscores[0:10]:
+            print("%f\t%s" % (score, self.geturlname(url)))
+
+    def normalizescores(self, scores, smallIsBetter = 0):
+        vsmall = 0.00001
+
+        if smallIsBetter:
+            minScore = min(scores.values())
+            return dict([(u,float(minScore) / max(vsmall, s)) for (u, s) in scores.items()])
+        else:
+            maxScore = max(scores.values())
+            if maxScore == 0:   maxScore = vsmall
+            return dict([(u, float(s) / maxScore) for (u, s) in scores.items()])
+
+    def frequencyscore(self, rows):
+        counts = dict([(row[0], 0) for row in rows])
+        for row in rows:    counts[row[0]] += 1;
+        return self.normalizescores(counts)
+
+    def locationscore(self, rows):
+        location = dict([(row[0], 1000000) for row in rows])
+
+        for row in rows:
+            loc = sum(row[1:])
+            if loc < location[row[0]]:  location[row[0]] = loc
+
+        return self.normalizescores(location, smallIsBetter = 1)
+                    
+    def distancescore(self, rows):
+        if len(rows[0]) <= 2:   return dict([(row[0], 1.0) for row in rows])
+
+        mindistance = dict([(rows[0], 1000000) for row in rows])
+
+        for row in rows:
+            dist = sum([abs(row[i] - row[i - 1]) for i in range(2, len(row))])
+            if dist < mindistance[row[0]] : mindistance[row[0]] = dist
+
+        return self.normalizescores(mindistance, smallIsBetter = 1)
