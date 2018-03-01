@@ -3,6 +3,8 @@ from bs4 import BeautifulSoup
 from urllib.parse import urljoin
 import sqlite3
 import re
+import nn
+mynet = nn.searchnet('nn.db')
 
 ignorewords = set(['the','of','to','and','a','in','is','it'])
 
@@ -174,7 +176,7 @@ class searcher:
 
     def getscorelist(self, rows, wordids):
         totalscores = dict([(row[0], 0) for row in rows])
-        weights = [(1.0, self.frequencyscore(rows)), (1.0, self.locationscore(rows)), (1.0, self.distancescore(rows)), (1.0, self.inboundlinkscore(rows)), (1.0, self.pagerankscore(rows))]
+        weights = [(1.0, self.frequencyscore(rows)), (1.0, self.locationscore(rows)), (1.0, self.distancescore(rows)), (1.0, self.inboundlinkscore(rows)), (1.0, self.pagerankscore(rows)), (1.0, self.linkTextScore(rows, wordids))]
 
         for (weight,score) in weights:
             for url in totalscores:
@@ -241,3 +243,19 @@ class searcher:
         normalizescores = dict([(u, float(s) / maxrank) for (u, s) in pageranks.items()])
         return normalizescores
 
+    def linkTextScore(self, rows, wordids):
+        linkscores = dict([(row[0], 0) for row in rows])
+        for wordid in wordids:
+            cur = self.con.execute('select link.fromid,link.toid from linkwords,link where linkwords.wordid = %d and link.rowid = linkwords.linkid' % wordid)
+            for (fromid, toid) in cur:
+                if toid in linkscores:
+                    pr = self.con.execute('select score from pagerank where urlid = %d' % fromid).fetchone()[0]
+                    linkscores[toid] += pr
+        return self.normalizescores(linkscores)
+
+    def nnscore(self, rows, wordids):
+        urlids = [urlid for urlid in set([row[0] for row in rows])]
+        nnscores = mynet.getresult(wordids, urlids)
+        scores = dict([(urlids[i], nnscores[i]) for i in range(len(urlids))])
+
+        return self.normalizescores(scores)
