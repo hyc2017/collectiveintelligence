@@ -176,7 +176,7 @@ class searcher:
 
     def getscorelist(self, rows, wordids):
         totalscores = dict([(row[0], 0) for row in rows])
-        weights = [(1.0, self.frequencyscore(rows)), (1.0, self.locationscore(rows)), (1.0, self.distancescore(rows)), (1.0, self.inboundlinkscore(rows)), (1.0, self.pagerankscore(rows)), (1.0, self.linkTextScore(rows, wordids))]
+        weights = [(1.0, self.frequencyscore(rows)), (1.0, self.locationscore(rows)), (1.0, self.distancescore(rows)), (1.0, self.inboundlinkscore(rows)), (1.0, self.pagerankscore(rows)), (1.0, self.linkTextScore(rows, wordids)), (1.0, self.nnscore(rows, wordids))]
 
         for (weight,score) in weights:
             for url in totalscores:
@@ -191,8 +191,7 @@ class searcher:
         rows, wordids = self.getmatchrows(q)
         scores = self.getscorelist(rows, wordids)
         rankedscores = sorted([(score,url) for (url,score) in scores.items()], reverse = 1)
-        for (score, url) in rankedscores[0:10]:
-            print("%f\t%s" % (score, self.geturlname(url)))
+        return wordids, [r[1] for r in rankedscores[0:10]]
 
     def normalizescores(self, scores, smallIsBetter = 0):
         vsmall = 0.00001
