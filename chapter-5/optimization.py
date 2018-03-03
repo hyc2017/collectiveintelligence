@@ -65,3 +65,81 @@ def randomoptimize(domain, costf):
             bestr = r
 
     return r
+
+def hillclimb(domain, costf):
+    sol = [random.randint(domain[i][0], domain[i][1]) for i in range(len(domain))]
+
+    while 1:
+        neighbors = []
+        current = costf(sol)
+        best = current
+
+        for i in range(len(domain)):
+            if sol[i] > domain[i][0]:   neighbors.append(sol[0:i] + [sol[i] - 1] + sol[i + 1:])
+            if sol[i] > domain[i][1]:   neighbors.append(sol[0:i] + [sol[i] + 1] + sol[i + 1:])
+        for j in range(len(neighbors)):
+            if costf(neighbors[j]) < best:
+                best = costf(neighbors[j])
+                sol = neighbors[j]
+        if current == best:
+            break
+
+    return sol
+
+def annealingoptimize(domain, costf, T = 10000.0, cool = 0.95, step = 1):
+    sol = [random.randint(domain[i][0], domain[i][1]) for i in range(len(domain))]
+
+    while T > 0.1:
+        i = random.randint(0, len(domain) - 1)
+        dir = random.randint(-step, step)
+        solB = sol[:]
+        solB[i] += dir
+        if solB[i] < domain[i][0]:  solB[i] = domain[i][0]
+        if solB[i] > domain[i][1]:  solB[i] = domain[i][1]
+
+        cost = costf(sol)
+        costB = costf(solB)
+        if costB < cost or random.random() < pow(math.e, -(costB - cost) / T):
+            sol = solB
+
+        T = T * cool
+
+    return sol
+
+def geneticoptimize(domain, costf, popsize = 50, step = 1, mutprob = 0.2, elite = 0.2, maxiter = 100):
+    def mutate(vec):
+        i = random.randint(0, len(domain) - 1)
+
+        if random.random() < 0.5 and vec[i] > domain[i][0]:
+            return vec[0:i] + [vec[i] - step] + vec[i+1:]
+        elif vec[i] < domain[i][1]:
+            return vec[0:i] + [vec[i] + step] + vec[i+1:]
+
+    def crossover(vec1, vec2):
+        i = random.randint(1, len(domain) - 2)
+        return vec1[0:i] + vec2[i:]
+
+    pop = []
+    for i in range(popsize):
+        vec = [random.randint(domain[i][0], domain[i][1]) for i in range(len(domain))]
+        pop.append(vec)
+
+    topelite = int(popsize * elite)
+
+    for i in range(maxiter):
+        scores = [(costf(vec), vec) for vec in pop]
+        scores.sort()
+        ranked = [vec for (score, vec) in scores]
+        pop = ranked[0:topelite]
+
+        while len(pop) < popsize:
+            if random.random() < mutprob:
+                c = random.randint(0, topelite)
+                pop.append(mutate(ranked[c]))
+            else:
+                c1 = random.randint(0, topelite)
+                c2 = random.randint(0, topelite)
+                pop.append(crossover(ranked[c1], ranked[c2]))
+        print(scores[0][0])
+
+    return scores[0][1]
