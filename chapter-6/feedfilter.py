@@ -27,7 +27,7 @@ def entryfeatures(entry):
     for w in titlewords:    f['Title:' + w] = 1
 
     summarywords =  [s.lower() for s in splitter.split(entry['summary']) if len(s) > 2 and len(s) < 20]
-    summarywords2 = [s for s in splitter.split(entry['summary']) if len(s) > 2and len(s) < 20]
+    summarywords2 = [s for s in splitter.split(entry['summary']) if len(s) > 2 and len(s) < 20]
 
     uc = 0
     for i in range(len(summarywords)):
