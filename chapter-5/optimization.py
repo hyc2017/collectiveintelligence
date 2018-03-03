@@ -114,6 +114,8 @@ def geneticoptimize(domain, costf, popsize = 50, step = 1, mutprob = 0.2, elite 
             return vec[0:i] + [vec[i] - step] + vec[i+1:]
         elif vec[i] < domain[i][1]:
             return vec[0:i] + [vec[i] + step] + vec[i+1:]
+            
+        return vec
 
     def crossover(vec1, vec2):
         i = random.randint(1, len(domain) - 2)
